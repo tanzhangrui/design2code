@@ -1,0 +1,67 @@
+# design2code.skill.yaml
+name: Design2Code
+description: 将Figma设计稿转换为精确的Vue前端代码
+version: 0.1.0
+author: 谭张锐
+triggers:
+  - type: command
+    command: design2code
+    description: 输入Figma链接生成代码
+steps:
+  - id: get_input
+    type: input
+    prompt: "请输入Figma页面链接（格式：https://www.figma.com/file/[fileKey]/[fileName]?node-id=[nodeId]）"
+    validate: |
+      const regex = /https:\/\/www\.figma\.com\/file\/([a-zA-Z0-9]+)\/.*node-id=([0-9-]+)/;
+      if (!regex.test(input)) {
+        return "请输入正确的Figma页面链接";
+      }
+      return true;
+  - id: extract_params
+    type: code
+    code: |
+      const regex = /https:\/\/www\.figma\.com\/file\/([a-zA-Z0-9]+)\/.*node-id=([0-9-]+)/;
+      const match = input.match(regex);
+      return {
+        fileKey: match[1],
+        nodeId: match[2].replace("-", ":")
+      };
+  - id: get_figma_data
+    type: tool
+    tool: figma-mcp-server/get_figma_file
+    arguments:
+      fileKey: ${extract_params.fileKey}
+      nodeId: ${extract_params.nodeId}
+  - id: analyze_design
+    type: llm
+    prompt: |
+      你是一名资深前端工程师，擅长分析Figma设计稿并生成精确的Vue代码。
+      请分析以下Figma设计稿数据：
+      ${get_figma_data.content[0].text}
+      
+      请完成以下分析：
+      1. 描述页面的整体布局结构
+      2. 识别页面中的主要组件和元素
+      3. 提取所有关键的样式属性（颜色、字体、字号、边距等）
+      4. 给出代码实现的大致思路
+  - id: generate_code
+    type: llm
+    prompt: |
+      基于以下设计稿分析结果，生成一个Vue 3单文件组件：
+      ${analyze_design}
+      
+      要求：
+      1. 使用Vue 3的Composition API和<script setup>语法
+      2. 使用Tailwind CSS进行样式编写
+      3. 代码结构清晰，注释完善
+      4. 尽可能精确地还原设计稿的布局和样式
+      5. 不需要实现任何交互逻辑
+  - id: output_result
+    type: output
+    content: |
+      ## 设计稿分析结果
+      ${analyze_design}
+      
+      ## 生成的Vue代码
+      ```vue
+      ${generate_code}
